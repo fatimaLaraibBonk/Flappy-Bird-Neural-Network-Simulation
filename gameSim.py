@@ -41,15 +41,15 @@ class bird:
 def get_state(bird_obj, pillar_obj, gap_centre_y):
     state=np.array([
     [bird_obj.y / 900],
-    [bird_obj.velocity / 10],
+    [bird_obj.velocity / 12],
     [(pillar_obj.x1 - bird_obj.x) / 900],
-    [gap_centre_y / 900]
+    [(gap_centre_y - bird_obj.y )/ 900]
     ])
     return state
 
 def flap(bird_obj):
     #print("Flapping bird..")
-    bird_obj.velocity=-3
+    bird_obj.velocity-=0.7
     pass
 
 def passedGap(bird_obj, pillar):
@@ -126,8 +126,8 @@ def run_game(model):
     pillar_width=80
 
     #bird data
-    velocity=0
-    gravity=0.05
+    velocity=3
+    gravity=0.3
     bird_radius=20
     #starting positions of the bird 
     bird_x=200
@@ -166,7 +166,7 @@ def run_game(model):
             h2=bottom_height
         )
         gameOver=False 
-        reward=1
+        reward=0.01
         #check pillars
         if len(pillars)==0:
             pillars.append(new_pillar)
@@ -208,27 +208,36 @@ def run_game(model):
         #the width of the structures is fixed 
 
         #neural network integration 
-        next_pillar=pillars[0]
+        next_pillar=next((p for p in pillars if not p.passed), pillars[0])
         gap_centre_y=next_pillar.h1+gap_size/2
         state=get_state(
             bird_obj,
             next_pillar,
             gap_centre_y
         )
+        #print(state.flatten())
         action=model.action(state)
+        #print("Action taken: ", action)
         #print(action)
         if action==1:
             #print("Model decided to flap.")
             flap(bird_obj)
+            pass
         else:
             #print("Model decided not to flap.")
             pass
-
+        old_gap_error=abs(bird_obj.y - gap_centre_y)
         #physics update
-        bird_obj.velocity+=gravity
+        bird_obj.velocity=min(bird_obj.velocity + gravity, 12)
         bird_obj.y+=bird_obj.velocity
-
+        distance_from_gap=abs(bird_obj.y - gap_centre_y)
+        reward+=(1-distance_from_gap/screen_height)*0.05
         #calculate reward
+        new_gap_error = abs(bird_obj.y - gap_centre_y)
+        if new_gap_error < old_gap_error:
+            reward += 0.05
+        else:
+            reward -= 0.05
         for p in pillars:
             if passedGap(bird_obj, p):
                 fitness += 50 
@@ -236,7 +245,7 @@ def run_game(model):
             #collided funtion returns 0 if no collision has occured
             if (fitness_value := collided(bird_obj, p)):
                 fitness+=fitness_value
-                reward-=10
+                reward-=100
                 gameOver=True
                 break
         
@@ -278,7 +287,8 @@ def run_game(model):
         screen.blit(time_text, (700, 60))
 
         pygame.display.flip()
-        clock.tick(0) #FPS
+        clock.tick(60) #FPS
+
     pygame.quit()
     return None
 
@@ -288,13 +298,28 @@ def run_game(model):
 model=neuralNetwork.NeuralNetwork(
     numOfInputs=4,
     numOfOutputs=2,
-    hiddenLayers=2,
-    numOfNeuronsPerHiddenLayer=[3,4]
+    hiddenLayers=3,
+    numOfNeuronsPerHiddenLayer=[8,8,8]
 )
+
+
 #initializing weights
 model.initialize_weights()
+fitness_history=[]
 for episode in range(1000):
-    fitness=run_game(model)
-    print(
-        f"Episode {episode} with score {fitness}"
+    fitness = run_game(model)
+    fitness_history.append(fitness)
+
+    model.epsilon = max(
+        model.epsilon_min,
+        model.epsilon * model.epsilon_decay
     )
+    if (episode + 1) % 10 == 0:
+        recent = fitness_history[-10:]
+
+        print(
+            f"Episodes {episode-8}-{episode+1} | "
+            f"avg = {sum(recent)/10:.2f} | "
+            f"best = {max(recent)} | "
+            f"epsilon = {model.epsilon:.3f}"
+        )
