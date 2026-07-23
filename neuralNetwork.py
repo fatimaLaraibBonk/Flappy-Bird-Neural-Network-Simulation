@@ -99,16 +99,15 @@ class NeuralNetwork:
         return np.argmax(q_values)
     
     def _train_on_one(self, state, action, reward, next_state, done):
-        gamma = 0.99
-        learning_rate = 0.001
+        gamma=0.99
+        learning_rate=0.001
 
-        # 1. Forward pass for current state (keeps its own activations/z_values)
-        current_q, state_activations, state_z_values = self.calculation(state)
+        #Forward pass for current state (keeps its own activations/z_values)
+        current_q, state_activations, state_z_values=self.calculation(state)
+        #Forward pass for next state (isolated, won't overwrite state variables)
+        next_q, _, _=self.calculation(next_state)
 
-        # 2. Forward pass for next state (isolated, won't overwrite state variables)
-        next_q, _, _ = self.calculation(next_state)
-
-        # 3. Compute target Q-value
+        #target Q-value
         if done:
             target_q = reward
         else:
@@ -118,8 +117,7 @@ class NeuralNetwork:
         
         target = current_q.copy()
         target[action] = target_q
-        
-        # Loss gradient wrt output: dL/d(Q)
+    
         delta = current_q - target
 
         # 4. Backpropagation using state_activations and state_z_values directly

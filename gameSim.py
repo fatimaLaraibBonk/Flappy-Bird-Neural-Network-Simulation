@@ -4,10 +4,11 @@ import sys
 import random #for randomization of the pillars 
 import neuralNetwork
 import numpy as np 
+import matplotlib.pyplot as plt
 
 #class for pillars/incoming structures that we divided into two-> top half and bottom half with a gap between them 
 class pillar:
-    def __init__(self, x1, x2, y1, y2, width, h1, h2):
+    def __init__(self, x1, x2, y1, y2, width, h1, h2, gap_y, gap_size):
         #the width of both the segments is the same 
         self.passed=False #to keep track if the pillar has been passed, since a pillar can only be passed once 
         self.x1=x1
@@ -17,6 +18,9 @@ class pillar:
         self.width=width
         self.h1=h1
         self.h2=h2
+        self.gap_y=gap_y
+        self.gap_size=gap_size
+        self.gap_center=gap_y+gap_size/2
 
     def draw_pillar(self, surface):
         #x,y,width,height
@@ -66,11 +70,11 @@ def collided(bird_obj, pillar):
     #collided with top (of window)
     if bird_obj.y - bird_obj.radius <= 0:
         #print("Collided with top of the window!")
-        return -10
+        return -30
     #collided with bottom (of window)
     if bird_obj.y + bird_obj.radius >= screen_height:
         #print("Collided with bottom of the window! ")
-        return -10
+        return -30
     #collided with top part of pillar (strctures)
     #collided with bottom part of pillar (structures)
     horizontal_overlap = (
@@ -80,10 +84,10 @@ def collided(bird_obj, pillar):
     if horizontal_overlap:
         if bird_obj.y - bird_obj.radius <= pillar.h1:
             #print("Collided with top half!")
-            return -10
+            return -25
         if bird_obj.y + bird_obj.radius >= pillar.y2:
             #print("Collided with bottom half!")
-            return -10
+            return -25
 
     return 0
 
@@ -163,7 +167,9 @@ def run_game(model):
             y2=bottom_y,
             width=pillar_width,
             h1=top_height,
-            h2=bottom_height
+            h2=bottom_height,
+            gap_size=gap_size,
+            gap_y=gap_y
         )
         gameOver=False 
         reward=0.01
@@ -209,7 +215,7 @@ def run_game(model):
 
         #neural network integration 
         next_pillar=next((p for p in pillars if not p.passed), pillars[0])
-        gap_centre_y=next_pillar.h1+gap_size/2
+        gap_centre_y=next_pillar.gap_center
         state=get_state(
             bird_obj,
             next_pillar,
@@ -240,12 +246,12 @@ def run_game(model):
             reward -= 0.05
         for p in pillars:
             if passedGap(bird_obj, p):
-                fitness += 50 
-                reward+=5
+                fitness+=20
+                reward+=20
             #collided funtion returns 0 if no collision has occured
             if (fitness_value := collided(bird_obj, p)):
                 fitness+=fitness_value
-                reward-=100
+                reward+=fitness_value
                 gameOver=True
                 break
         
@@ -298,15 +304,17 @@ def run_game(model):
 model=neuralNetwork.NeuralNetwork(
     numOfInputs=4,
     numOfOutputs=2,
-    hiddenLayers=3,
-    numOfNeuronsPerHiddenLayer=[8,8,8]
+    hiddenLayers=2,
+    numOfNeuronsPerHiddenLayer=[8,8]
 )
 
 
 #initializing weights
 model.initialize_weights()
 fitness_history=[]
-for episode in range(1000):
+avg_fitness_history=[]
+episodes=1000
+for episode in range(episodes):
     fitness = run_game(model)
     fitness_history.append(fitness)
 
@@ -323,3 +331,12 @@ for episode in range(1000):
             f"best = {max(recent)} | "
             f"epsilon = {model.epsilon:.3f}"
         )
+        avg=sum(recent)/10
+        avg_fitness_history.append(avg)
+x=[i for i in range(episodes) if i%10==0]
+y=avg_fitness_history
+plt.plot(x,y)
+plt.title("Fitness History")
+plt.xlabel("Number of episodes")
+plt.ylabel("Fitness Value")
+plt.show()
