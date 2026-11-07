@@ -3,6 +3,7 @@ from pygame.locals import *
 import sys
 import random #for randomization of the pillars 
 import neuralNetwork
+import visualiser
 import numpy as np 
 import matplotlib.pyplot as plt
 
@@ -292,6 +293,7 @@ def run_game(model):
         screen.blit(score_text, (700, 20))
         screen.blit(time_text, (700, 60))
 
+        visualiser.draw_network(screen, model, state)
         pygame.display.flip()
         clock.tick(60) #FPS
 
